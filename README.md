@@ -1,93 +1,286 @@
-# SP documentation
+# Εγκατάσταση και παραμετροποίηση  Shibboleth SP v3.x σε Debian-Ubuntu Linux
+
+## Table of Contents
+
+1. [Προαπαιτούμενα](#απαιτήσεις-συστήματος)
+2. [Λογισμικό που θα εγκατασταθεί](#λογισμικό-που-θα-εγκατασταθεί)
+3. [Άλλες απαιτήσεις](#άλλες-απαιτήσεις)
+4. [Οδηγίες εγκατάστασης](#οδηγίες-εγκατάστασης)
+   1. [Εγκατάσταση των προαπαιτούμενων λογισμικών](#install-software-requirements)
+   2. [Παραμετροποίηση environment](#configure-the-environment)
+   3. [Εγκατάσταση Shibboleth Service Provider](#install-shibboleth-service-provider)
+5. [Οδηγίες παραμετροποίησης](#configuration-instructions)
+   1. [Παράδειγμα παραμετροποίησης SSL σε Apache2](#configure-ssl-on-apache2)
+   2. [Παραμετροποίηση Shibboleth SP](#configure-shibboleth-sp)
+   3. [Παράδειγμα παραμετροποίησης "secure" υπηρεσίες](#configure-an-example-federated-resource-secure)
+   4. [Enable Attribute Support on Shibboleth SP](#enable-attribute-support-on-shibboleth-sp)
+6. [Test](#test)
+8. [Increase startup timeout](#increase-startup-timeout)
+9. [OPTIONAL - Maintain 'shibd' working](#optional---maintain-shibd-working)
+10. [Utility](#utility)
+11. [Authors](#authors)
+12. [Thanks](#thanks)
 
 
+## Απαιτήσεις συστήματος
 
-## Getting started
+ * CPU: 2 Core
+ * RAM: 4 GB
+ * HDD: 20 GB
+ * OS: Debian 10
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Λογισμικό που θα εγκατασταθεί
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+ * ca-certificates
+ * ntp
+ * vim
+ * libapache2-mod-php, php, libapache2-mod-shib, apache2 (>= 2.4)
+ * openssl
 
-## Add your files
+## Άλλες απαιτήσεις
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+ * SSL Credentials: HTTPS Certificate & Key
 
+## Οδηγίες Εγκατάστασης
+
+### Install software requirements
+
+1. Become ROOT:
+   * `sudo su -`
+   
+2. Ενημερώσεις πακέτων:
+   * `apt update && apt-get upgrade -y --no-install-recommends`
+  
+3. Εγκατάσταση απαιτούμενων πακέτων: 
+   * `apt install ca-certificates vim openssl`
+
+
+### Εγκατάσταση Shibboleth Service Provider
+
+1. Become ROOT: 
+   * `sudo su -`
+
+2. Εγκατάσταση Shibboleth SP:
+   * `apt install apache2 libapache2-mod-shib ntp --no-install-recommends`
+
+
+## Οδηγίες παραμετροποίησης
+
+### Παραμετροποίηση SSL και Apache2
+
+> Η παραμετροποίηση αυτή είναι ένα παράδειγμα, μπορεί να μην ανταποκρίνεται στην πραγματικότητα
+
+1. Become ROOT:
+   * `sudo su -`
+
+2. Δημιουργία του DocumentRoot:
+   ```bash
+   mkdir /var/www/html/myservice
+   
+   echo '<h1>It Works!</h1>' > /var/www/html/myservice/index.html
+   ```
+3. Εγκατάσταση certbot για τα SSL πιστοποιητικά
+   * `sudo snap install --classic certbot`
+   * `sudo ln -s /snap/bin/certbot /usr/bin/certbot`
+
+   Εγκατάσταση πιστοποιητικού για apache
+   * `sudo certbot --apache`
+
+4. Δημιουργία Virtualhost 
+
+    Επεξεργαστείτε το αρχείο
+
+   ```/etc/apache2/sites-enabled/000-default-le-ssl.conf ```
+   ```bash 
+   <IfModule mod_ssl.c>
+    <VirtualHost _default_:443>
+    ServerAdmin info@kapoiosp.com
+    ServerName localhost
+    DocumentRoot /var/www/html/myservice
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/καποιοσπ/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/καποιοσπ/privkey.pem
+    <FilesMatch "\.(cgi|shtml|phtml|php)$">
+        SSLOptions +StdEnvVars
+    </FilesMatch>
+    <Directory /usr/lib/cgi-bin>
+      SSLOptions +StdEnvVars
+    </Directory>
+    BrowserMatch "MSIE [2-6]" \
+      nokeepalive ssl-unclean-shutdown \
+      downgrade-1.0 force-response-1.0
+    BrowserMatch "MSIE [17-9]" ssl-unclean-shutdown
+    Alias /myservice/ /var/www/html/myservice/
+    <Location /myservice/>
+      AuthType shibboleth
+      ShibRequestSetting requireSession 1
+      Require valid-user
+    </Location>
+   </VirtualHost>
+   </IfModule>
+   ```
+
+6. Ενεργοποίηση **proxy_http**, **SSL** και **headers** Apache2 modules:
+   ```bash
+   a2enmod ssl headers alias include negotiation
+      
+   systemctl restart apache2.service
+   ```
+
+### Παραμετροποίηση Shibboleth SP
+
+1. Become ROOT: 
+   * `sudo su -`
+
+2. Αλλαγή του SP entityID και email επικοινωνίας τεχνικού υπεύθυνου:
+   ```bash
+   sed -i "s/sp.example.org/$(hostname -f)/" /etc/shibboleth/shibboleth2.xml
+   
+   sed -i "s/root@localhost/<TECH-CONTACT-EMAIL-ADDRESS-HERE>/" /etc/shibboleth/shibboleth2.xml
+   
+   sed -i 's/handlerSSL="false"/handlerSSL="true"/' /etc/shibboleth/shibboleth2.xml
+   
+   sed -i 's/cookieProps="http"/cookieProps="https"/' /etc/shibboleth/shibboleth2.xml
+   
+   sed -i 's/cookieProps="https">/cookieProps="https" redirectLimit="exact">/' /etc/shibboleth/shibboleth2.xml
+   ```
+
+3. Δημιουργία ζεύγους κλειδιών Signing και Encryption για τα SP metadata:
+   * Ubuntu:
+     ```bash
+     cd /etc/shibboleth
+   
+     shib-keygen -u _shibd -g _shibd -h $(hostname -f) -y 30 -e https://$(hostname -f)/shibboleth -n sp-signing -f
+   
+     shib-keygen -u _shibd -g _shibd -h $(hostname -f) -y 30 -e https://$(hostname -f)/shibboleth -n sp-encrypt -f
+   
+     /usr/sbin/shibd -t
+ 
+     systemctl restart shibd.service
+   
+     systemctl restart apache2.service
+     ```
+
+   * Debian
+     ```bash
+     cd /etc/shibboleth
+   
+     ./keygen.sh -u shibd -g shibd -h $(hostname -f) -y 30 -e https://$(hostname -f)/shibboleth -n sp-signing -f
+   
+     ./keygen.sh -u shibd -g shibd -h $(hostname -f) -y 30 -e https://$(hostname -f)/shibboleth -n sp-encrypt -f
+   
+     LD_LIBRARY_PATH=/opt/shibboleth/lib64 /usr/sbin/shibd -t
+ 
+     systemctl restart shibd.service
+   
+     systemctl restart apache2.service
+     ```
+
+4. Ενεργοποίηση Shibboleth Apache2:
+   ```bash
+   a2enmod shib
+   
+   systemctl reload apache2.service
+   ```
+
+5. Πλέον μπορείτε να δείτε τα metadata του SP στο:
+   * ht<span>tps://</span>sp.example.org/Shibboleth.sso/Metadata
+
+     (*Αντικαταστήστε το `sp.example.org` με το FQDN σας*)
+
+
+### Κατανάλωση metadata grnet και edugain
+Επεξεργαστείτε το ```/etc/shibboleth/shibboleth2.xml```
+και προσθέστε το παρακάτω
+```bash
+<MetadataProvider type="XML" uri="https://md.aai.grnet.gr/aggregates/grnet-metadata.xml"
+backingFilePath="metadata-delos-grnet.xml" reloadInterval="7200">
+  <MetadataFilter type="RequireValidUntil" maxValidityInterval="604800"/> 
+  <MetadataFilter type="Signature" certificate="grnet-mdsigner.crt"/>
+</MetadataProvider>
 ```
-cd existing_repo
-git remote add origin https://gitlab.grnet.gr/hadem/sp-documentation.git
-git branch -M main
-git push -uf origin main
+ώπου το mdsigner-delos-grnet.crt μπορείτε να το βρείτε εδώ
+``` https://md.aai.grnet.gr/grnetaai_md_cert.html ```
+αποθηκεύστε το τοπικά με 
+```bash
+cd /etc/shibboleth/
+curl -o grnet-mdsigner.crt https://md.aai.grnet.gr/grnetaai_md_cert.pem
+```
+Αντίστοιχα για το eduGAIN:
+```bash
+<MetadataProvider type="XML" uri="https://md.aai.grnet.gr/feeds/edugain-idp-samlmd.xml"
+  backingFilePath="metadata-default-edugain_all.xml" reloadInterval="7200">
+  <MetadataFilter type="RequireValidUntil" maxValidityInterval="604800"/>
+  <MetadataFilter type="Signature" certificate="grnet-mdsigner.crt"/>
+</MetadataProvider>
 ```
 
-## Integrate with your tools
 
-- [ ] [Set up project integrations](https://gitlab.grnet.gr/hadem/sp-documentation/-/settings/integrations)
 
-## Collaborate with your team
+## Increase startup timeout
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+Shibboleth Documentation: https://wiki.shibboleth.net/confluence/display/SP3/LinuxSystemd
 
-## Test and Deploy
+```bash
+sudo mkdir /etc/systemd/system/shibd.service.d
 
-Use the built-in continuous integration in GitLab.
+echo -e '[Service]\nTimeoutStartSec=60min' | sudo tee /etc/systemd/system/shibd.service.d/timeout.conf
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+sudo systemctl daemon-reload
 
-***
+sudo systemctl restart shibd.service
+```
 
-# Editing this README
+## OPTIONAL - Maintain '```shibd```' working
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+1. Edit '`shibd`' init script:
+   * `vim /etc/init.d/shibd`
 
-## Suggestions for a good README
+     ```bash
+     #...other lines...
+     ### END INIT INFO
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+     # Import useful functions like 'status_of_proc' needed to 'status'
+     . /lib/lsb/init-functions
 
-## Name
-Choose a self-explaining name for your project.
+     #...other lines...
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+     # Add 'status' operation
+     status)
+       status_of_proc -p "$PIDFILE" "$DAEMON" "$NAME" && exit 0 || exit $?
+       ;;
+     *)
+       echo "Usage: $SCRIPTNAME {start|stop|restart|force-reload|status}" >&2
+       exit 1
+       ;;
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+     esac
+     exit 0
+     ```
+2. Create a new watchdog for '`shibd`':
+   * `vim /etc/cron.hourly/watch-shibd.sh`
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+     ```bash
+     #! /bin/bash
+     SERVICE=/etc/init.d/shibd
+     STOPPED_MESSAGE="failed"
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+     if [[ "`$SERVICE status`" == *"$STOPPED_MESSAGE"* ]];
+     then
+       $SERVICE stop
+       sleep 1
+       $SERVICE start
+     fi
+     ```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+3. Reload daemon:
+   * `systemctl daemon-reload`
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+## Authors
+* Halil Adem για το GRNET
+ 
+## Thanks
+ * GARR WIKI: https://github.com/ConsortiumGARR/idem-tutorials/blob/master/idem-fedops/HOWTO-Shibboleth/Service%20Provider/Debian/HOWTO%20Install%20and%20Configure%20a%20Shibboleth%20SP%20v3.x%20on%20Debian-Ubuntu%20Linux.md
+ 
