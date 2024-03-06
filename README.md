@@ -1,25 +1,26 @@
-# Εγκατάσταση και παραμετροποίηση  Shibboleth SP v3.x σε Debian-Ubuntu Linux
+# Οδηγίες εγκατάστασης και παραμετροποίσης Shibboleth SP v3.x on Debian-Ubuntu Linux
 
-## Table of Contents
+<img width="120px" src="https://grnet.gr/wp-content/uploads/2023/01/01_EDYTE_LOGO_COLOR-1.png" />
+
+## Περιεχόμενα
 
 1. [Προαπαιτούμενα](#απαιτήσεις-συστήματος)
 2. [Λογισμικό που θα εγκατασταθεί](#λογισμικό-που-θα-εγκατασταθεί)
 3. [Άλλες απαιτήσεις](#άλλες-απαιτήσεις)
 4. [Οδηγίες εγκατάστασης](#οδηγίες-εγκατάστασης)
    1. [Εγκατάσταση των προαπαιτούμενων λογισμικών](#install-software-requirements)
-   2. [Παραμετροποίηση environment](#configure-the-environment)
-   3. [Εγκατάσταση Shibboleth Service Provider](#install-shibboleth-service-provider)
-5. [Οδηγίες παραμετροποίησης](#configuration-instructions)
-   1. [Παράδειγμα παραμετροποίησης SSL σε Apache2](#configure-ssl-on-apache2)
-   2. [Παραμετροποίηση Shibboleth SP](#configure-shibboleth-sp)
-   3. [Παράδειγμα παραμετροποίησης "secure" υπηρεσίες](#configure-an-example-federated-resource-secure)
-   4. [Enable Attribute Support on Shibboleth SP](#enable-attribute-support-on-shibboleth-sp)
-6. [Test](#test)
-8. [Increase startup timeout](#increase-startup-timeout)
-9. [OPTIONAL - Maintain 'shibd' working](#optional---maintain-shibd-working)
-10. [Utility](#utility)
-11. [Authors](#authors)
-12. [Thanks](#thanks)
+   2. [Παραμετροποίηση environment](#προετοιμασία-περιβάλλοντος)
+   3. [Εγκατάσταση Shibboleth Service Provider](#εγκατάσταση-shibboleth-service-provider)
+5. [Οδηγίες παραμετροποίησης](#οδηγίες-παραμετροποίησης)
+   1. [Παράδειγμα παραμετροποίησης SSL σε Apache2](#παραμετροποίηση-ssl-και-apache2)
+   2. [Παραμετροποίηση Shibboleth SP](#παραμετροποίηση-shibboleth-sp)
+   3. [Ενεργοποίηση υποστήριξης των επιθυμητών Attributes στο Shibboleth SP](#ενεργοποίηση-υποστήριξης-των-επιθυμητών-attributes-στο-shibboleth-sp)
+   4. [Κατανάλωση metadata grnet και edugain](#κατανάλωση-metadata-grnet-και-edugain)
+7. [Άυξηση startup timeout](#αυξηση-startup-timeout)
+8. [OPTIONAL - Maintain 'shibd' working](#optional---maintain-shibd-working)
+9. [Utility](#utility)
+10. [Authors](#authors)
+11. [Thanks](#thanks)
 
 
 ## Απαιτήσεις συστήματος
@@ -41,6 +42,12 @@
 
  * SSL Credentials: HTTPS Certificate & Key
 
+## Notes
+
+Σε αυτόν τον οδηγό χρησιμοποιείται το `example.org` για domain name και `sp.example.org` για FQDN (Full Qualified Domain Name) για να δώσουμε κάποιες τιμές στα παραδείγματά μας
+
+Παρακαλούμε πολύ, θυμηθείτε να **αντικαταστήσετε** τα `example.org` domain name  και `sp.example.org` με τις τιμές αυτών του δικού σας σέρβερ.
+
 ## Οδηγίες Εγκατάστασης
 
 ### Install software requirements
@@ -54,6 +61,17 @@
 3. Εγκατάσταση απαιτούμενων πακέτων: 
    * `apt install ca-certificates vim openssl`
 
+### Προετοιμασία περιβάλλοντος
+
+1. Επεξεργαστείτε το  `/etc/hosts`:
+   * `vim /etc/hosts`
+  
+     ```bash
+     127.0.1.1 sp.example.org sp
+     ```
+   (*Αντικαταστήστε το `sp.example.org` με το δικό σας SP Full Qualified Domain Name*)
+   
+   (*Αντικαταστήστε `sp` με το hostname του SP*)
 
 ### Εγκατάσταση Shibboleth Service Provider
 
@@ -63,12 +81,14 @@
 2. Εγκατάσταση Shibboleth SP:
    * `apt install apache2 libapache2-mod-shib ntp --no-install-recommends`
 
+   Από δω και στο εξής η τοποθεσία του SP στον server  θα είναι στο /etc/shibboleth
+
 
 ## Οδηγίες παραμετροποίησης
 
 ### Παραμετροποίηση SSL και Apache2
 
-> Η παραμετροποίηση αυτή είναι ένα παράδειγμα, μπορεί να μην ανταποκρίνεται στην πραγματικότητα
+> Η παραμετροποίηση αυτή είναι ένα παράδειγμα, προσαρμόστε ανάλογα των απαιτήσεών σας
 
 1. Become ROOT:
    * `sudo su -`
@@ -122,7 +142,7 @@
    </IfModule>
    ```
 
-6. Ενεργοποίηση **proxy_http**, **SSL** και **headers** Apache2 modules:
+5. Ενεργοποίηση **proxy_http**, **SSL** και **headers** Apache2 modules:
    ```bash
    a2enmod ssl headers alias include negotiation
       
@@ -191,6 +211,12 @@
      (*Αντικαταστήστε το `sp.example.org` με το FQDN σας*)
 
 
+### Ενεργοποίηση υποστήριξης των επιθυμητών Attributes στο Shibboleth SP
+> Το Attribute Map αρχείο χρησιμοποιείται από το Service Provider για την αναγνώριση και υποστήριξη των attributes που απελευθερώνονται από τους Identity Providers
+
+Για να ενεργοποιήσετε τα επιθυμητά attributes θα χρειαστεί να τα βγάλετε από comments στο αρχείο `/etc/shibboleth/attribute-map.xml` και στην συνέχεια προχωρήστε σε restart του `shibd` service:
+* `sudo systemctl restart shibd.service`
+
 ### Κατανάλωση metadata grnet και edugain
 Επεξεργαστείτε το ```/etc/shibboleth/shibboleth2.xml```
 και προσθέστε το παρακάτω
@@ -217,9 +243,20 @@ curl -o grnet-mdsigner.crt https://md.aai.grnet.gr/grnetaai_md_cert.pem
 </MetadataProvider>
 ```
 
+Τα metadata του eduGAIN λογω του αρκετά μεγάλου αριθμού συμμετεχόντων έχουν αυξηθεί πολύ σε μέγεθος. 
+Για τον λόγο αυτό προτείνεται η αύξηση του timeout στην εκκίνηση του SP
 
 
-## Increase startup timeout
+Εναλλακτικά, μπορεί να χρησιμοποιηθεί η **ΔΟΚΙΜΑΣΤΙΚΗ/STAGING** υπηρεσία mdq [https://github.com/iay/md-query] του GRNET. 
+Για την ενεργοποίηση αυτού 
+```bash
+<MetadataProvider type="Dynamic" ignoreTransport="true" maxCacheDuration="86400" minCacheDuration="60">
+    <Subst>http://mdq.grnet.gr:8080/entities/$entityID</Subst>
+</MetadataProvider>
+```
+
+
+## Αύξηση του startup timeout
 
 Shibboleth Documentation: https://wiki.shibboleth.net/confluence/display/SP3/LinuxSystemd
 
