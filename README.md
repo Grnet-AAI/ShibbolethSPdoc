@@ -221,7 +221,7 @@
 Επεξεργαστείτε το ```/etc/shibboleth/shibboleth2.xml```
 και προσθέστε το παρακάτω
 ```bash
-<MetadataProvider type="XML" uri="https://md.aai.grnet.gr/aggregates/grnet-metadata.xml"
+<MetadataProvider type="XML" url="https://md.aai.grnet.gr/aggregates/grnet-metadata.xml"
 backingFilePath="metadata-delos-grnet.xml" reloadInterval="7200">
   <MetadataFilter type="RequireValidUntil" maxValidityInterval="604800"/> 
   <MetadataFilter type="Signature" certificate="grnet-mdsigner.crt"/>
@@ -236,7 +236,7 @@ curl -o grnet-mdsigner.crt https://md.aai.grnet.gr/grnetaai_md_cert.pem
 ```
 Αντίστοιχα για το eduGAIN:
 ```bash
-<MetadataProvider type="XML" uri="https://md.aai.grnet.gr/feeds/edugain-idp-samlmd.xml"
+<MetadataProvider type="XML" url="https://md.aai.grnet.gr/feeds/edugain-idp-samlmd.xml"
   backingFilePath="metadata-default-edugain_all.xml" reloadInterval="7200">
   <MetadataFilter type="RequireValidUntil" maxValidityInterval="604800"/>
   <MetadataFilter type="Signature" certificate="grnet-mdsigner.crt"/>
